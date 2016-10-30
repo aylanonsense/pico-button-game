@@ -3,34 +3,57 @@ version 8
 __lua__
 
 
--- constants
-local entity_classes={
-	["arrow_pad"]={
-	}
-}
-
-
 -- vars
 local scene=nil
 local bg_color=0
 local entities={}
 local new_entities={}
+local arrow_pads={}
+
+
+-- constants
+local entity_classes={
+	["arrow_pad"]={
+		["width"]=13,
+		["height"]=13,
+		["state"]="inactive",
+		["add_to_game"]=function(entity)
+			add(arrow_pads,entity)
+		end,
+		["draw"]=function(entity)
+		end
+	}
+}
 
 
 -- main functions
 function _init()
+	-- start the game
 	init_game()
 end
 
 function _update()
+	-- update the scene
 	if scene=="game" then
 		update_game()
 	end
 end
 
 function _draw()
+	-- reset the canvas
 	camera()
 	rectfill(0,0,127,127,bg_color)
+	-- draw guidelines
+	color(2)
+	line(0,0,0,127)
+	line(62,0,62,127)
+	line(65,0,65,127)
+	line(127,0,127,127)
+	line(0,0,127,0)
+	line(0,62,127,62)
+	line(0,65,127,65)
+	line(0,127,127,127)
+	-- draw the scene
 	if scene=="game" then
 		draw_game()
 	end
@@ -43,17 +66,42 @@ function init_game()
 	-- reset everything
 	entities={}
 	new_entities={}
+	arrow_pads={}
 	-- create entities
-	create_entity("arrow_pad",{})
+	create_entity("arrow_pad",{
+		["dir"]="left",
+		["x"]=57-15,
+		["y"]=57
+	})
+	create_entity("arrow_pad",{
+		["dir"]="right",
+		["x"]=57+15,
+		["y"]=57
+	})
+	create_entity("arrow_pad",{
+		["dir"]="up",
+		["x"]=57,
+		["y"]=57-15
+	})
+	create_entity("arrow_pad",{
+		["dir"]="down",
+		["x"]=57,
+		["y"]=57+15
+	})
 end
 
 function update_game()
 	-- update entities
 	foreach(entities,function(entity)
+		-- do some default update stuff
+		entity.frames_alive=increment_looping_number(entity.frames_alive)
+		entity.state_frames=increment_looping_number(entity.state_frames)
+		-- call the entity's update function
 		entity.update(entity)
 	end)
 	-- add new entities to the game
 	foreach(new_entities,function(entity)
+		entity.add_to_game(entity)
 		add(entities,entity)
 	end)
 	new_entities={}
@@ -62,6 +110,13 @@ end
 function draw_game()
 	-- draw entities
 	foreach(entities,function(entity)
+		-- draw a debug square
+		if entity.width>0 and entity.height>0 then
+			local x=entity.x+0.5
+			local y=entity.y+0.5
+			rectfill(x,y,x+entity.width-1,y+entity.height-1,5)
+		end
+		-- actually draw the entity
 		entity.draw(entity)
 	end)
 end
@@ -69,25 +124,36 @@ end
 
 -- entity functions
 function create_entity(class_name,args)
-	local entity_class=entity_classes[class_name]
+	-- create default entity
 	local entity={
+		["class_name"]=class_name,
 		["x"]=0,
 		["y"]=0,
+		["width"]=0,
+		["height"]=0,
+		["state"]="default",
+		["state_frames"]=0,
 		["is_alive"]=0,
 		["frames_alive"]=0,
 		["init"]=noop,
+		["add_to_game"]=noop,
 		["update"]=noop,
-		["draw"]=noop
+		["draw"]=noop,
+		["set_state"]=set_entity_state
 	}
+	-- add class properties/methods onto it
 	local k
 	local v
-	for k,v in pairs(entity_class) do
+	for k,v in pairs(entity_classes[class_name]) do
 		entity[k]=v
 	end
+	-- add properties onto it from the arguments
 	for k,v in pairs(args) do
 		entity[k]=v
 	end
+	-- initialize it
 	entity.init(entity,args)
+	-- return it
 	add(new_entities,entity)
 	return entity
 end
@@ -95,6 +161,20 @@ end
 
 -- helper methods
 function noop() end
+
+function increment_looping_number(n)
+	n+=1
+	if n>32000 then
+		n-=3000
+	end
+	return n
+end
+
+function set_entity_state(entity,state)
+	entity.state=state
+	entity.state_frames=0
+end
+
 
 
 __gfx__
